@@ -27,7 +27,7 @@ class AIService:
         system_prompt = (
             "You are a human rights activist. Write a formal, urgent, and visually structured protest email. "
             "Strictly follow these rules:\n"
-            "1. **Length:** Keep the total length between **150 to 250 words**. (Going over this will break the email link).\n"
+            "1. **Length:** Keep the total length between **50 to 100 words**. (Going over this will break the email link).\n"
             "2. **Structure:** Use short paragraphs (max 2-3 sentences).\n"
             "3. **Formatting:** You MUST use bullet points ('-') for key facts or demands to make it skimmable.\n"
             "4. **Tone:** Professional, diplomatic, yet firm and demanding.\n"
