@@ -9,8 +9,8 @@ TARGETS = {
     
     "emails": [
             "ffmiran@un.org",  # مخصوص ارسال مدارک به کمیته حقیقت‌یاب
-            "urgent-action@ohchr.org",     # اقدام فوری (Urgent Action)
-            "ohchr-civilsociety@un.org"    # بخش جامعه مدنی دفتر کمیساریا (OHCHR)
+            "ohchr-ced-ua@un.org",     # اقدام فوری (Urgent Action)
+            "publications@ohchr.org"    # بخش جامعه مدنی دفتر کمیساریا (OHCHR)
         ],
     
     "email_labels": [
@@ -27,7 +27,7 @@ TARGETS = {
         "name_fa": "گزارشگر ویژه سازمان ملل در امور ایران ✍️",
         "topic": "Urgent Report to Special Rapporteur on Iran",
         "topic_fa": "گزارش فوری به گزارشگر ویژه در امور ایران",
-        "emails": ["sr-iran@un.org", "urgent-action@ohchr.org"],
+        "emails": ["hrc-sr-iran@un.org", "ohchr-ced-ua@un.org"],
         "email_labels": [
             "ارسال مستقیم به گزارشگر ویژه",
             "بخش اقدامات فوری سازمان ملل"
@@ -42,14 +42,22 @@ TARGETS = {
         "topic": "Demand for Action: Sanctions and Human Rights Protection",
         "topic_fa": "درخواست اقدام: تحریم‌ها و حفاظت از حقوق بشر",
         "emails": [
-            "cab-borrell-fontelles-contact@ec.europa.eu",
+            "francisco.fontan@ec.europa.eu",
             "president@ep.europa.eu",
-            "comm-spp-hrvp-borrell@ec.europa.eu"
+            "comm-spp-hrvp-borrell@ec.europa.eu",
+            "pierre.fermigier@ec.europa.eu",        # مسئول میز ایران
+            "guillermo.martinez-erades@ec.europa.eu", # مسئول تحریم‌ها و حقوق بشر
+            "cab-borrell-fontelles-contact@ec.europa.eu", # ایمیل کلی دفتر بورل
+            "aili.ribulis@ec.europa.eu"             # مسئول امنیت و ضدتروریسم
         ],
         "email_labels": [
             "جوزپ بورل (سیاست خارجی)",
             "رئیس پارلمان اروپا",
-            "سخنگوی ارشد اتحادیه اروپا"
+            "سخنگوی ارشد اتحادیه اروپا",
+            "مسئول مستقیم پرونده ایران (Pierre Fermigier)",
+            "مسئول سیاست تحریم‌ها و حقوق بشر (Guillermo Martinez)",
+            "دفتر مرکزی جوزپ بورل",
+            "مسئول ضدتروریسم و امنیت (Aili Ribulis)"
         ],
         "twitter": "@EU_Commission"
     },
@@ -62,11 +70,10 @@ TARGETS = {
         "topic_fa": "لزوم اقدام دیپلماتیک: بحران حقوق بشر در ایران",
         "emails": [
             "fcdo.correspondence@fcdo.gov.uk",
-            "buergerservice@diplo.de",
-            "minister.office@international.gc.ca",
-            "minister.cabinet@diplomatie.gouv.fr",
-            "NEA-PublicInquiries@state.gov",
-            "secretary@state.gov"
+            "buergerservice@auswaertiges-amt.de",
+            "SOS@international.gc.ca",
+            "Webmestre.france-visas@diplomatie.gouv.fr",
+            "tehran.fi@eda.admin.ch",
         ],
         "email_labels": [
             "وزارت خارجه انگلیس",
@@ -74,7 +81,6 @@ TARGETS = {
             "وزارت خارجه کانادا",
             "وزارت خارجه فرانسه",
             "وزارت خارجه آمریکا (میز ایران)",
-            "وزارت خارجه آمریکا (دفتر وزیر)"
         ],
         "twitter": "@StateDept"
     },
@@ -85,7 +91,7 @@ TARGETS = {
         "name_fa": "عفو بین‌الملل (میز ایران) 🕯️",
         "topic": "Urgent Action: Stop Executions and Torture in Iran",
         "topic_fa": "اقدام فوری: توقف اعدام و شکنجه در ایران",
-        "emails": ["mena@amnesty.org", "contactus@amnesty.org"],
+        "emails": ["middleeast@amnesty.org", "israelpalestine@amnesty.org"],
         "email_labels": [
             "بخش خاورمیانه و شمال آفریقا",
             "بخش ارتباطات عمومی عفو بین‌الملل"
@@ -97,7 +103,7 @@ TARGETS = {
         "name_fa": "دیده‌بان حقوق بشر (خاورمیانه) 🛡️",
         "topic": "Report of Abuse: Middle East & North Africa Division",
         "topic_fa": "گزارش نقض حقوق بشر: بخش خاورمیانه و شمال آفریقا",
-        "emails": ["middleeast@hrw.org", "hrwpress@hrw.org"],
+        "emails": ["WFP.Tehran@wfp.org", "beirut@hrw.org"],
         "email_labels": [
             "دفتر خاورمیانه دیده‌بان حقوق بشر",
             "بخش مطبوعات و رسانه"
