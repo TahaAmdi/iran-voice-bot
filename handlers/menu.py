@@ -1,15 +1,14 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.constants import ParseMode
 from telegram.ext import ContextTypes
-from config.targets import TARGETS  # خواندن لیست هدف‌ها از کانفیگ
+from config.targets import TARGETS  # خواندن لیست هدف‌ها
 
 async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
-    نمایش منوی اصلی با متن جذاب، انگیزشی و توضیحات امنیتی.
-    این هندلر هم دستور /start و هم دکمه «بازگشت به منو» را مدیریت می‌کند.
+    نمایش منوی اصلی با متن فارسی و دکمه‌های فارسی‌سازی شده.
     """
     
-    # متن خوش‌آمدگویی با فرمت HTML
+    # متن خوش‌آمدگویی (بر اساس عکسی که فرستادید)
     welcome_text = (
         "👋 <b>سلام هموطن! به «صدای ایران» خوش آمدی.</b>\n\n"
         
@@ -22,24 +21,20 @@ async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "✉️ <b>ارسال امن:</b> ایمیل‌ها مستقیماً از اپلیکیشن شخصی شما (Gmail/Outlook) ارسال می‌شوند و ربات هیچ دسترسی به اکانت شما ندارد.\n"
         "🤖 <b>متن هوشمند:</b> متن‌ها توسط هوش مصنوعی تولید می‌شوند تا هر ایمیل منحصر‌به‌فرد باشد و اسپم نشود.\n\n"
         
-        "👇 <b>همین حالا سازمان یا نهاد مورد نظر را انتخاب کنید و صدای بی‌صدایان باشید:</b>"
+        "👇 <b>همین حالا سازمان یا نهاد مورد نظر را انتخاب کنید:</b>"
     )
 
-    # ساخت دکمه‌ها از روی لیست TARGETS موجود در فایل کانفیگ
+    # ساخت دکمه‌ها با اولویت نام فارسی
     keyboard = []
     for key, data in TARGETS.items():
-        # نام دکمه را از کانفیگ می‌خوانیم
-        button_text = data['name']
+        # ✅ تغییر اصلی اینجاست: استفاده از name_fa به جای name
+        button_text = data.get('name_fa', data['name'])
         keyboard.append([InlineKeyboardButton(button_text, callback_data=key)])
-
-    # لینک به گیت‌هاب (اختیاری - اگر دارید آن‌کامنت کنید)
-    # keyboard.append([InlineKeyboardButton("کد منبع باز (Open Source) 🌐", url="https://github.com/YOUR_USERNAME/YOUR_REPO")])
 
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    # تشخیص اینکه دستور استارت بوده یا دکمه بازگشت
+    # مدیریت نمایش پیام
     if update.callback_query:
-        # حالت دکمه بازگشت (پیام قبلی ویرایش می‌شود تا صفحه شلوغ نشود)
         query = update.callback_query
         await query.answer()
         await query.edit_message_text(
@@ -48,7 +43,6 @@ async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode=ParseMode.HTML
         )
     else:
-        # حالت دستور /start (پیام جدید ارسال می‌شود)
         await update.message.reply_text(
             text=welcome_text,
             reply_markup=reply_markup,
