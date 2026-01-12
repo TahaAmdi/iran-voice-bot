@@ -1,5 +1,6 @@
 import urllib.parse
 import html
+import asyncio
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ForceReply
 from telegram.constants import ParseMode
 from telegram.ext import ContextTypes
@@ -10,7 +11,7 @@ from handlers.menu import start_handler
 
 ai_service = AIService()
 
-MAX_MAILTO_BODY_LEN = 1000  # حد امن برای mailto روی موبایل
+MAX_MAILTO_BODY_LEN = 350  # حد امن برای جلوگیری از کرش در موبایل
 
 
 def shorten(text: str, n: int = 60) -> str:
@@ -110,35 +111,40 @@ async def generate_final_email(update: Update, context: ContextTypes.DEFAULT_TYP
         return
 
     try:
-        # -------- تولید متن ایمیل --------
+        # -------- تولید متن ایمیل (AI) --------
+        # تلاش برای تولید متن
         full_body = await ai_service.generate_email(
             target_data["topic"],
             custom_details=custom_info
         )
+        
+        # اگر AI خروجی نداد یا خالی بود
+        if not full_body:
+            raise Exception("AI returned empty response")
+
         full_subject = target_data["topic"]
 
-        # -------- نسخه‌های کوتاه برای mailto --------
+        # -------- آماده‌سازی ایمیل --------
         short_subject = shorten(full_subject, 80)
         short_body = full_body[:MAX_MAILTO_BODY_LEN]
 
-        # -------- encode برای URL --------
+        # انکودینگ
         safe_short_subject = urllib.parse.quote(short_subject)
         safe_short_body = urllib.parse.quote(short_body)
-
         safe_full_subject = urllib.parse.quote(full_subject)
         safe_full_body = urllib.parse.quote(full_body)
 
-        # -------- ساخت لینک‌ها --------
+        # ساخت لینک‌های ایمیل
         links_section = ""
         for idx, email in enumerate(target_data["emails"], start=1):
-
-            # mailto → کوتاه
+            
+            # لینک موبایل (Mailto)
             mailto_link = (
                 f"mailto:{email}"
                 f"?subject={safe_short_subject}&body={safe_short_body}"
             )
-
-            # gmail web → کامل
+            
+            # لینک وب (Gmail)
             gmail_web_link = (
                 "https://mail.google.com/mail/"
                 f"?view=cm&fs=1&to={email}"
@@ -147,37 +153,37 @@ async def generate_final_email(update: Update, context: ContextTypes.DEFAULT_TYP
 
             links_section += (
                 f"📨 <b>گیرنده {idx}:</b> {email}\n"
-                f"📱 <a href='{mailto_link}'>باز کردن در اپ ایمیل روی لینک ایمیل بالا بزنید </a>\n"
-                f"💻 <a href='{gmail_web_link}'>باز کردن در Gmail Web (متن کامل)</a>\n\n"
+                f"📱 <a href='{mailto_link}'>ارسال با اپلیکیشن موبایل</a>\n"
+                f"💻 <a href='{gmail_web_link}'>ارسال با Gmail Web</a>\n\n"
             )
 
-        # -------- نسخه‌های نمایشی برای کپی --------
+        # -------- رفع باگ SyntaxError --------
+        # شرط را اینجا محاسبه می‌کنیم
+        custom_info_display = ""
+        if custom_info:
+            custom_info_display = f"📌 <b>توضیحات شما:</b> {html.escape(shorten(custom_info))}\n"
+
         safe_subject_display = html.escape(full_subject)
         safe_body_display = html.escape(full_body)
-
-        # ✅✅✅ اصلاح ارور SyntaxError: محاسبه شرط بیرون از f-string ✅✅✅
-        custom_info_str = ""
-        if custom_info:
-            custom_info_str = f"📌 <b>توضیحات شما:</b> {html.escape(shorten(custom_info))}\n"
 
         # -------- متن نهایی --------
         final_text = (
             "✅ <b>ایمیل شما آماده است</b>\n\n"
-            "📱 <b>راهنمای موبایل:</b>\n"
-            "اگر لینک اپ فقط Gmail را باز کرد، subject و متن زیر را کپی کنید.\n\n"
+            "📱 <b>راهنمای موبایل (ایمیل):</b>\n"
+            "روی لینک «ارسال با اپلیکیشن» بزنید. اگر کار نکرد، متن پایین را کپی کنید.\n\n"
             "💻 <b>راهنمای کامپیوتر:</b>\n"
-            "لینک Gmail Web ایمیل را با متن کامل باز می‌کند.\n\n"
+            "لینک Gmail Web را بزنید.\n\n"
             f"📝 <b>موضوع:</b> {safe_subject_display}\n"
-            f"{custom_info_str}\n"  # اینجا قبلاً باعث ارور می‌شد که الان درست شد
-            "👇 <b>لینک‌ها:</b>\n\n"
+            f"{custom_info_display}\n"
+            "👇 <b>لینک‌های ارسال:</b>\n\n"
             f"{links_section}"
             "━━━━━━━━━━━━━━━━━━\n"
             "📌 <b>Subject کامل (برای کپی):</b>\n"
-            "روی متن بزنید → Copy\n\n"
+            "روی متن بزنید و نگه دارید → Copy\n\n"
             f"<pre>{safe_subject_display}</pre>\n"
             "━━━━━━━━━━━━━━━━━━\n"
             "✂️ <b>متن کامل ایمیل (برای کپی):</b>\n"
-            "روی متن بزنید   → Copy\n\n"
+            "روی متن بزنید و نگه دارید → Copy\n\n"
             f"<pre>{safe_body_display}</pre>"
         )
 
@@ -193,5 +199,11 @@ async def generate_final_email(update: Update, context: ContextTypes.DEFAULT_TYP
         )
 
     except Exception as e:
-        print("EMAIL_GENERATION_ERROR:", e)
-        await message.edit_text("❌ خطا در ساخت ایمیل. لطفاً دوباره تلاش کنید.")
+        print(f"EMAIL_GENERATION_ERROR: {e}")
+        error_msg = str(e)
+        
+        # اگر خطا مربوط به Rate Limit باشد
+        if "429" in error_msg or "Rate limit" in error_msg:
+             await message.edit_text("⏳ لطفاً چند ثانیه صبر کنید و دوباره امتحان کنید (محدودیت هوش مصنوعی).")
+        else:
+             await message.edit_text(f"❌ خطا در ساخت ایمیل: {error_msg[:100]}...")
