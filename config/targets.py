@@ -1,17 +1,27 @@
 TARGETS = {
     # 1. نهادهای ویژه سازمان ملل
     "UN_FFM_IRAN": {
-        "name": "UN Fact-Finding Mission on Iran 🇺🇳",
-        "name_fa": "کمیته حقیقت‌یاب سازمان ملل 🇺🇳",
-        "topic": "Submission of Evidence: Human Rights Violations in Iran",
-        "topic_fa": "ارسال اسناد و مدارک: نقض حقوق بشر در ایران",
-        "emails": ["ffmiron@un.org", "cp@ohchr.org"],
-        "email_labels": [
-            "ایمیل مستقیم کمیته حقیقت‌یاب (FFM)",
-            "دفتر کمیساریای عالی حقوق بشر (OHCHR)"
+    "name": "UN Fact-Finding Mission on Iran 🇺🇳",
+    "name_fa": "کمیته حقیقت‌یاب سازمان ملل درباره ایران 🇺🇳",
+    
+    "topic": "Submission of Evidence – Human Rights Violations in Iran",
+    "topic_fa": "ارسال اسناد و شواهد – نقض حقوق بشر در ایران",
+    
+    "emails": [
+            "ffmiran@un.org",  # مخصوص ارسال مدارک به کمیته حقیقت‌یاب
+            "urgent-action@ohchr.org",     # اقدام فوری (Urgent Action)
+            "ohchr-civilsociety@un.org"    # بخش جامعه مدنی دفتر کمیساریا (OHCHR)
         ],
-        "twitter": "@UN_HRC"
+    
+    "email_labels": [
+        "ایمیل رسمی کمیته حقیقت‌یاب برای ایران (FFM)",
+        "اقدام فوری حقوق بشری (Urgent Action)",
+        "دفتر کمیساریای عالی حقوق بشر (OHCHR)"
+    ],
+    
+    "twitter": "@UN_HRC"
     },
+
     "UN_SR_IRAN": {
         "name": "UN Special Rapporteur on Iran ✍️",
         "name_fa": "گزارشگر ویژه سازمان ملل در امور ایران ✍️",
