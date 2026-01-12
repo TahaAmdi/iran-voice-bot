@@ -44,7 +44,7 @@ class AIService:
                     {"role": "user", "content": user_message}
                 ],
                 temperature=0.7,
-                max_tokens=600,
+                max_tokens=300,
                 top_p=0.9,
             )
             return response.choices[0].message.content.strip()
