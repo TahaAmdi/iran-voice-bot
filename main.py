@@ -12,11 +12,12 @@ from settings import settings
 from config.targets import TARGETS
 from handlers.menu import start_handler
 
-# ایمپورت توابع منطقی از فایل email_gen
+# ✅ تغییر ۱: اضافه کردن email_selection_handler به ایمپورت‌ها
 from handlers.email_gen import (
     target_selection_handler, 
     ask_data_handler, 
-    receive_custom_data_handler
+    receive_custom_data_handler,
+    email_selection_handler  # <--- این تابع جدید باید اینجا باشد
 )
 
 # تنظیمات لاگینگ
@@ -48,16 +49,18 @@ if __name__ == '__main__':
     # 2. هندلر دکمه بازگشت (اولویت بالا)
     application.add_handler(CallbackQueryHandler(back_handler, pattern="^BACK_TO_MENU$"))
 
-    # 3. هندلر انتخاب Yes/No (برای افزودن جزئیات)
-    application.add_handler(CallbackQueryHandler(ask_data_handler, pattern="^ADD_DATA_(YES|NO)$"))
-
-    # 4. هندلر انتخاب هدف (سازمان‌ها)
-    # پترنی می‌سازیم که فقط کلیدهای موجود در TARGETS را قبول کند
+    # 3. هندلر انتخاب هدف (سازمان‌ها)
     keys_pattern = "^(" + "|".join(TARGETS.keys()) + ")$"
     application.add_handler(CallbackQueryHandler(target_selection_handler, pattern=keys_pattern))
 
+    # ✅ تغییر ۲: هندلر انتخاب ایمیل (این خط حیاتی است!)
+    # این خط به ربات می‌گوید هر وقت دکمه‌ای با پیشوند SEL_MAIL_ زده شد، تابع مربوطه را اجرا کن
+    application.add_handler(CallbackQueryHandler(email_selection_handler, pattern="^SEL_MAIL_"))
+
+    # 4. هندلر انتخاب Yes/No (برای افزودن جزئیات)
+    application.add_handler(CallbackQueryHandler(ask_data_handler, pattern="^ADD_DATA_(YES|NO)$"))
+
     # 5. هندلر دریافت متن (وقتی کاربر Yes زده و تایپ می‌کند)
-    # این هندلر فقط متن‌ها را می‌گیرد (نه دستورات) و به تابع receive_custom_data_handler می‌دهد
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, receive_custom_data_handler))
 
     print("✅ Bot is running. Press Ctrl+C to stop.")
