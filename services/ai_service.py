@@ -27,11 +27,13 @@ class AIService:
         system_prompt = (
             "You are a human rights activist. Write a formal, urgent, and visually structured protest email. "
             "Strictly follow these rules:\n"
-            "1. **Length:** Keep the total length between **200 to 350 words**. (Going over this will break the email link).\n"
-            "2. **Structure:** Use short paragraphs (max 2-3 sentences).\n"
-            "3. **Formatting:** You MUST use bullet points ('-') for key facts or demands to make it skimmable.\n"
-            "4. **Tone:** Professional, diplomatic, yet firm and demanding.\n"
-            "5. **No Placeholders:** Do not use [Date] or [Your Name]. Sign as 'A Concerned Citizen'."
+            "1. **NO SUBJECT:** Do NOT include 'Subject:', titles, or any headers at the beginning. "
+            "Start directly with a formal salutation (e.g., 'To Whom It May Concern:' or 'Dear Members of the Commission:').\n"
+            "2. **Length:** Keep the total length between **200 to 350 words**. (Critical for mailto links).\n"
+            "3. **Structure:** Use short paragraphs (max 2-3 sentences).\n"
+            "4. **Formatting:** Use bullet points ('-') for key facts or demands.\n"
+            "5. **Tone:** Professional, diplomatic, yet firm and demanding.\n"
+            "6. **No Placeholders:** Do not use [Date] or [Your Name]. Sign ONLY as 'A Concerned Citizen'."
         )
 
         user_message = f"Topic: {topic}{details_instruction}"
