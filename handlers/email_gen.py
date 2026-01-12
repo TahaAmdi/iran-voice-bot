@@ -5,12 +5,12 @@ from telegram.constants import ParseMode
 from telegram.ext import ContextTypes
 from services.ai_service import AIService
 from config.targets import TARGETS
-from handlers.menu import start_handler # برای بازگشت به منو
+from handlers.menu import start_handler 
 
 ai_service = AIService()
 
 # ---------------------------------------------------------
-# مرحله ۱: وقتی کاربر روی اسم سازمان (مثلاً UN) کلیک می‌کند
+# مرحله ۱: انتخاب سازمان
 # ---------------------------------------------------------
 async def target_selection_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -22,7 +22,6 @@ async def target_selection_handler(update: Update, context: ContextTypes.DEFAULT
     if not target_data:
         return
 
-    # ذخیره هدف انتخاب شده
     context.user_data['selected_target'] = target_data
     context.user_data['custom_info'] = None  
 
@@ -44,7 +43,7 @@ async def target_selection_handler(update: Update, context: ContextTypes.DEFAULT
     )
 
 # ---------------------------------------------------------
-# مرحله ۲: بررسی انتخاب کاربر (بله یا خیر)
+# مرحله ۲: پرسش برای دریافت متن
 # ---------------------------------------------------------
 async def ask_data_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -56,12 +55,7 @@ async def ask_data_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     elif data == "ADD_DATA_YES":
         context.user_data['state'] = 'WAITING_FOR_DETAILS'
-        
-        # نکته مهم: پیام قبلی را حذف می‌کنیم تا صفحه تمیز شود
         await query.message.delete()
-
-        # ارسال پیام جدید با ForceReply
-        # این کار باعث می‌شود کیبورد کاربر خودکار باز شود و روی این پیام ریپلای کند
         await context.bot.send_message(
             chat_id=update.effective_chat.id,
             text="✍️ لطفاً متن خود را بنویسید و ارسال کنید:",
@@ -69,45 +63,35 @@ async def ask_data_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
 # ---------------------------------------------------------
-# مرحله ۳: دریافت متنی که کاربر تایپ کرده
+# مرحله ۳: دریافت متن کاربر
 # ---------------------------------------------------------
 async def receive_custom_data_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # چک می‌کنیم آیا کاربر اجازه تایپ دارد؟ (یعنی دکمه YES را زده؟)
     if context.user_data.get('state') != 'WAITING_FOR_DETAILS':
-        # اگر کاربر همینطوری متنی فرستاد، آن را پاک می‌کنیم یا اخطار می‌دهیم
         try:
-            await update.message.delete()  # پیام الکی کاربر را پاک کن
+            await update.message.delete()
         except:
             pass
-        
-        # یک پیام موقت می‌فرستیم که "لطفا از دکمه‌ها استفاده کنید"
         msg = await update.message.reply_text("⛔️ لطفاً فقط از دکمه‌های منو استفاده کنید.")
         return 
 
-    # دریافت متن کاربر
     user_text = update.message.text
     context.user_data['custom_info'] = user_text
-    context.user_data['state'] = None # خروج از حالت انتظار
+    context.user_data['state'] = None 
 
-    # پیام "در حال دریافت"
     waiting_msg = await update.message.reply_text("⏳ دریافت شد! در حال نوشتن ایمیل...")
-    
-    # ساخت ایمیل نهایی
     await generate_final_email(update, context, message_object=waiting_msg)
 
 # ---------------------------------------------------------
-# مرحله ۴ (نهایی): ساخت و نمایش لینک‌ها (موبایل و وب)
+# مرحله ۴ (نهایی): ساخت لینک‌ها
 # ---------------------------------------------------------
 async def generate_final_email(update: Update, context: ContextTypes.DEFAULT_TYPE, message_object=None):
     target_data = context.user_data.get('selected_target')
     custom_info = context.user_data.get('custom_info')
 
     if not target_data:
-        # اگر دیتایی نبود، برگرد به منوی اصلی
         await start_handler(update, context)
         return
 
-    # تعیین پیامی که باید ادیت شود
     if message_object:
         message_to_edit = message_object
     elif update.callback_query:
@@ -120,36 +104,39 @@ async def generate_final_email(update: Update, context: ContextTypes.DEFAULT_TYP
         email_body = await ai_service.generate_email(target_data['topic'], custom_details=custom_info)
         email_subject = target_data['topic']
 
-        # آماده‌سازی لینک‌ها
-        # تبدیل خط جدید به فرمت استاندارد URL
-        safe_body = urllib.parse.quote(email_body, safe='')
-        safe_subject = urllib.parse.quote(email_subject, safe='')
+        # اینکود کردن متن برای قرارگیری در URL
+        safe_body = urllib.parse.quote(email_body)
+        safe_subject = urllib.parse.quote(email_subject)
 
         links_section = ""
+        # شمارنده برای اینکه اگر چند ایمیل بود، مشخص شود
+        count = 1
+        
         for email in target_data['emails']:
-            # لینک ۱: مخصوص موبایل (باز کردن اپلیکیشن) - از mailto استفاده می‌کند
+            # لینک ۱: Mailto (استاندارد جهانی موبایل)
+            # نکته: در اندروید و iOS این بهترین روش است
             mailto_link = f"mailto:{email}?subject={safe_subject}&body={safe_body}"
             
-            # لینک ۲: مخصوص کامپیوتر (نسخه وب Gmail)
+            # لینک ۲: وب (فقط دسکتاپ)
             gmail_web_link = f"https://mail.google.com/mail/?view=cm&fs=1&to={email}&su={safe_subject}&body={safe_body}"
             
             links_section += (
-                f"👤 <b>گیرنده: {email}</b>\n"
-                f"📱 <a href='{mailto_link}'>ارسال با اپلیکیشن (موبایل)</a>\n"
-                f"💻 <a href='{gmail_web_link}'>ارسال با وب (کامپیوتر)</a>\n\n"
+                f"📨 <b>گیرنده {count}:</b> {email}\n"
+                f"📱 <a href='{mailto_link}'>کلیک برای موبایل (App)</a>\n"
+                f"💻 <a href='{gmail_web_link}'>کلیک برای کامپیوتر (Web)</a>\n\n"
             )
+            count += 1
 
         safe_body_display = html.escape(email_body)
         
         final_text = (
             f"✅ **متن آماده شد!**\n"
-            f"{f'📌 <b>شامل توضیحات شما:</b> {html.escape(custom_info[:50])}...' if custom_info else ''}\n\n"
-            f"🎯 <b>هدف:</b> {target_data['name']}\n"
+            f"{f'📌 <b>توضیحات شما:</b> {html.escape(custom_info[:50])}...' if custom_info else ''}\n\n"
             f"📝 <b>موضوع:</b> {email_subject}\n\n"
-            f"👇 <b>یکی از لینک‌های زیر را انتخاب کنید:</b>\n\n"
+            f"👇 <b>لطفاً بر اساس دستگاه خود انتخاب کنید:</b>\n\n"
             f"{links_section}"
             f"--------------------------------\n"
-            f"⚠️ <i>اگر لینک‌ها کار نکرد، متن زیر را کپی کنید:</i>\n"
+            f"⚠️ <i>نکته مهم: اگر لینک موبایل کار نکرد، یعنی متن ایمیل خیلی طولانی شده است. لطفاً متن زیر را دستی کپی کنید:</i>\n\n"
             f"<pre>{safe_body_display}</pre>"
         )
 
