@@ -10,7 +10,8 @@ from handlers.menu import start_handler
 
 ai_service = AIService()
 
-MAX_MAILTO_BODY_LEN = 1800  # حد امن برای mailto روی موبایل
+# محدودیت سخت‌گیرانه برای لینک موبایل (بیشتر از این معمولاً نادیده گرفته می‌شود)
+MAX_MAILTO_BODY_LEN = 200
 
 
 def shorten(text: str, n: int = 60) -> str:
@@ -20,7 +21,7 @@ def shorten(text: str, n: int = 60) -> str:
 
 
 # ---------------------------------------------------------
-# مرحله ۱: انتخاب سازمان
+# هندلرهای انتخاب و دریافت ورودی (بدون تغییر منطقی)
 # ---------------------------------------------------------
 async def target_selection_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -52,9 +53,6 @@ async def target_selection_handler(update: Update, context: ContextTypes.DEFAULT
     )
 
 
-# ---------------------------------------------------------
-# مرحله ۲: انتخاب افزودن یا عدم افزودن متن
-# ---------------------------------------------------------
 async def ask_data_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -72,9 +70,6 @@ async def ask_data_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
 
-# ---------------------------------------------------------
-# مرحله ۳: دریافت متن کاربر
-# ---------------------------------------------------------
 async def receive_custom_data_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if context.user_data.get("state") != "WAITING_FOR_DETAILS":
         try:
@@ -92,7 +87,7 @@ async def receive_custom_data_handler(update: Update, context: ContextTypes.DEFA
 
 
 # ---------------------------------------------------------
-# مرحله ۴: ساخت لینک‌ها و خروجی نهایی
+# تابع اصلی ساخت ایمیل (بازنویسی شده برای رفع باگ لینک)
 # ---------------------------------------------------------
 async def generate_final_email(update: Update, context: ContextTypes.DEFAULT_TYPE, message_object=None):
     target_data = context.user_data.get("selected_target")
@@ -110,58 +105,63 @@ async def generate_final_email(update: Update, context: ContextTypes.DEFAULT_TYP
         return
 
     try:
-        # تولید متن ایمیل
+        # 1. تولید متن توسط هوش مصنوعی
         email_body = await ai_service.generate_email(
             target_data["topic"],
             custom_details=custom_info
         )
         email_subject = target_data["topic"]
 
-        # نسخه کوتاه برای mailto
-        mailto_body = email_body[:MAX_MAILTO_BODY_LEN]
+        # 2. آماده‌سازی متن برای لینک mailto (نسخه کوتاه)
+        # اگر متن خیلی طولانی باشد، اپ‌های موبایل کلاً Subject و Body را نادیده می‌گیرند.
+        if len(email_body) > MAX_MAILTO_BODY_LEN:
+            mailto_body_text = email_body[:MAX_MAILTO_BODY_LEN] + "...\n\n(متن کامل را از ربات کپی کنید)"
+        else:
+            mailto_body_text = email_body
 
-        safe_subject = urllib.parse.quote(email_subject)
-        safe_mailto_body = urllib.parse.quote(mailto_body)
-        safe_full_body = urllib.parse.quote(email_body)
+        # 3. انکودینگ (Encoding) تهاجمی برای رفع مشکل Subject
+        # پارامتر safe='' باعث می‌شود حتی کاراکترهای / : = هم انکود شوند.
+        # این حیاتی است تا لینک شکسته نشود.
+        safe_subject = urllib.parse.quote(email_subject, safe='')
+        safe_mailto_body = urllib.parse.quote(mailto_body_text, safe='')
+        safe_full_body = urllib.parse.quote(email_body, safe='') # برای وب
 
         links_section = ""
         for idx, email in enumerate(target_data["emails"], start=1):
-            mailto_link = (
-                f"mailto:{email}"
-                f"?subject={safe_subject}&body={safe_mailto_body}"
-            )
+            # ساخت لینک Mailto
+            mailto_link = f"mailto:{email}?subject={safe_subject}&body={safe_mailto_body}"
 
+            # ساخت لینک Gmail Web
             gmail_web_link = (
                 "https://mail.google.com/mail/"
                 f"?view=cm&fs=1&to={email}"
                 f"&su={safe_subject}&body={safe_full_body}"
             )
 
+            # استفاده از دابل کوتیشن " برای href تا با کوتیشن‌های احتمالی در URL تداخل نکند
             links_section += (
                 f"📨 <b>گیرنده {idx}:</b> {email}\n"
-                f"📱 <a href='{mailto_link}'>باز کردن در اپ ایمیل (موبایل)</a>\n"
-                f"💻 <a href='{gmail_web_link}'>باز کردن در Gmail Web (کامپیوتر)</a>\n\n"
+                f'📱 <a href="{mailto_link}">ارسال با اپلیکیشن (کلیک کنید)</a>\n'
+                f'💻 <a href="{gmail_web_link}">نسخه وب (مخصوص کامپیوتر)</a>\n\n'
             )
 
+        # 4. آماده‌سازی نمایش HTML
         safe_body_display = html.escape(email_body)
         safe_subject_display = html.escape(email_subject)
 
-        # -------------------------------------------------------
-        # اصلاح فیکس شده برای جلوگیری از ارور بک‌اسلش در f-string
-        # -------------------------------------------------------
+        # جلوگیری از خطای f-string (منطق در بیرون)
         custom_info_line = ""
         if custom_info:
             safe_custom_info = html.escape(shorten(custom_info))
             custom_info_line = f"📌 <b>توضیحات شما:</b> {safe_custom_info}\n"
 
+        # 5. چیدمان پیام نهایی
         final_text = (
             "✅ <b>ایمیل شما آماده است</b>\n\n"
-            "📱 <b>راهنمای موبایل:</b>\n"
-            "اگر با زدن لینک فقط Gmail باز شد، متن پایین را کپی کرده و دستی Paste کنید.\n\n"
-            "💻 <b>راهنمای کامپیوتر:</b>\n"
-            "لینک Gmail Web ایمیل را با متن آماده باز می‌کند.\n\n"
+            "⚠️ <b>نکته مهم:</b> اگر با زدن دکمهٔ «ارسال با اپلیکیشن»، موضوع یا متن وارد نشد، "
+            "به دلیل محدودیت‌های سیستم‌عامل گوشی است. در این صورت متن زیر را کپی کنید.\n\n"
             f"📝 <b>موضوع:</b> {safe_subject_display}\n"
-            f"{custom_info_line}\n"  # استفاده از متغیر آماده شده
+            f"{custom_info_line}\n"
             "👇 <b>لینک‌ها:</b>\n\n"
             f"{links_section}"
             "━━━━━━━━━━━━━━━━━━\n"
