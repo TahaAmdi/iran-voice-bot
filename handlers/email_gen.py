@@ -10,7 +10,7 @@ from handlers.menu import start_handler
 
 ai_service = AIService()
 
-MAX_MAILTO_BODY_LEN = 1000  # حد امن برای mailto روی موبایل
+MAX_MAILTO_BODY_LEN = 1800  # حد امن برای mailto روی موبایل
 
 
 def shorten(text: str, n: int = 60) -> str:
@@ -87,7 +87,7 @@ async def receive_custom_data_handler(update: Update, context: ContextTypes.DEFA
     context.user_data["custom_info"] = update.message.text
     context.user_data["state"] = None
 
-    waiting = await update.message.reply_text("⏳ دریافت شد. در حال آماده‌سازی ایمیل و توییت…")
+    waiting = await update.message.reply_text("⏳ دریافت شد. در حال آماده‌سازی ایمیل…")
     await generate_final_email(update, context, message_object=waiting)
 
 
@@ -110,55 +110,35 @@ async def generate_final_email(update: Update, context: ContextTypes.DEFAULT_TYP
         return
 
     try:
-        # -------- 1. تولید متن ایمیل --------
+        # -------- تولید متن ایمیل --------
         full_body = await ai_service.generate_email(
             target_data["topic"],
             custom_details=custom_info
         )
         full_subject = target_data["topic"]
 
-        # -------- 2. تولید متن توییت (در صورت وجود هندل توییتر) --------
-        twitter_handle = target_data.get("twitter")
-        tweet_text = ""
-        tweet_section_html = "" # متغیر برای نمایش در HTML
-
-        if twitter_handle:
-            tweet_text = await ai_service.generate_tweet(
-                topic=target_data["topic"],
-                target_handle=twitter_handle,
-                custom_details=custom_info
-            )
-            
-            # ساخت لینک ارسال توییت
-            safe_tweet = urllib.parse.quote(tweet_text)
-            tweet_link = f"https://twitter.com/intent/tweet?text={safe_tweet}"
-            
-            tweet_section_html = (
-                "🐦 <b>توییتر (X):</b>\n"
-                f"🚀 <a href='{tweet_link}'>برای ارسال توییت اینجا کلیک کنید</a>\n"
-                f"<code>{html.escape(tweet_text)}</code>\n"
-                "━━━━━━━━━━━━━━━━━━\n"
-            )
-
-        # -------- آماده‌سازی ایمیل برای لینک‌ها --------
+        # -------- نسخه‌های کوتاه برای mailto --------
         short_subject = shorten(full_subject, 80)
         short_body = full_body[:MAX_MAILTO_BODY_LEN]
 
-        # encode
+        # -------- encode برای URL --------
         safe_short_subject = urllib.parse.quote(short_subject)
         safe_short_body = urllib.parse.quote(short_body)
+
         safe_full_subject = urllib.parse.quote(full_subject)
         safe_full_body = urllib.parse.quote(full_body)
 
-        # ساخت لینک‌های ایمیل
+        # -------- ساخت لینک‌ها --------
         links_section = ""
         for idx, email in enumerate(target_data["emails"], start=1):
-            # mailto
+
+            # mailto → کوتاه
             mailto_link = (
                 f"mailto:{email}"
                 f"?subject={safe_short_subject}&body={safe_short_body}"
             )
-            # gmail web
+
+            # gmail web → کامل
             gmail_web_link = (
                 "https://mail.google.com/mail/"
                 f"?view=cm&fs=1&to={email}"
@@ -167,38 +147,32 @@ async def generate_final_email(update: Update, context: ContextTypes.DEFAULT_TYP
 
             links_section += (
                 f"📨 <b>گیرنده {idx}:</b> {email}\n"
-                f"📱 <a href='{mailto_link}'>باز کردن در اپ ایمیل (متن کوتاه)</a>\n"
+                f"📱 <a href='{mailto_link}'>باز کردن در اپ ایمیل روی لینک ایمیل بالا بزنید </a>\n"
                 f"💻 <a href='{gmail_web_link}'>باز کردن در Gmail Web (متن کامل)</a>\n\n"
             )
 
-        # -------- رفع باگ f-string (SyntaxError) --------
-        # محاسبه متن توضیحات بیرون از f-string
-        custom_info_display = ""
-        if custom_info:
-            custom_info_display = f"📌 <b>توضیحات شما:</b> {html.escape(shorten(custom_info))}\n"
-
+        # -------- نسخه‌های نمایشی برای کپی --------
         safe_subject_display = html.escape(full_subject)
         safe_body_display = html.escape(full_body)
 
         # -------- متن نهایی --------
         final_text = (
-            "✅ <b>محتوا آماده شد</b>\n\n"
-            f"{tweet_section_html}"
-            "📱 <b>راهنمای موبایل (ایمیل):</b>\n"
+            "✅ <b>ایمیل شما آماده است</b>\n\n"
+            "📱 <b>راهنمای موبایل:</b>\n"
             "اگر لینک اپ فقط Gmail را باز کرد، subject و متن زیر را کپی کنید.\n\n"
             "💻 <b>راهنمای کامپیوتر:</b>\n"
             "لینک Gmail Web ایمیل را با متن کامل باز می‌کند.\n\n"
             f"📝 <b>موضوع:</b> {safe_subject_display}\n"
-            f"{custom_info_display}\n"
-            "👇 <b>لینک‌های ارسال:</b>\n\n"
+            f"{f'📌 <b>توضیحات شما:</b> {html.escape(shorten(custom_info))}\n' if custom_info else ''}\n"
+            "👇 <b>لینک‌ها:</b>\n\n"
             f"{links_section}"
             "━━━━━━━━━━━━━━━━━━\n"
             "📌 <b>Subject کامل (برای کپی):</b>\n"
-            "روی متن بزنید و نگه دارید → Copy\n\n"
+            "روی متن بزنید → Copy\n\n"
             f"<pre>{safe_subject_display}</pre>\n"
             "━━━━━━━━━━━━━━━━━━\n"
             "✂️ <b>متن کامل ایمیل (برای کپی):</b>\n"
-            "روی متن بزنید و نگه دارید → Copy\n\n"
+            "روی متن بزنید   → Copy\n\n"
             f"<pre>{safe_body_display}</pre>"
         )
 
@@ -215,4 +189,4 @@ async def generate_final_email(update: Update, context: ContextTypes.DEFAULT_TYP
 
     except Exception as e:
         print("EMAIL_GENERATION_ERROR:", e)
-        await message.edit_text("❌ خطا در ساخت محتوا. لطفاً دوباره تلاش کنید.")
+        await message.edit_text("❌ خطا در ساخت ایمیل. لطفاً دوباره تلاش کنید.")
