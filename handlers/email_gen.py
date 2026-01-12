@@ -80,7 +80,7 @@ async def receive_custom_data_handler(update: Update, context: ContextTypes.DEFA
     await generate_final_email(update, context, message_object=waiting_msg)
 
 # ---------------------------------------------------------
-# مرحله ۴ (نهایی): ساخت خروجی هوشمند (لینک دسکتاپ + کپی موبایل)
+# مرحله ۴ (نهایی): دکمه‌ها اپلیکیشن را باز می‌کنند، متن کپی می‌شود
 # ---------------------------------------------------------
 async def generate_final_email(update: Update, context: ContextTypes.DEFAULT_TYPE, message_object=None):
     target_data = context.user_data.get('selected_target')
@@ -98,47 +98,39 @@ async def generate_final_email(update: Update, context: ContextTypes.DEFAULT_TYP
         return
 
     try:
-        # 1. تولید متن توسط هوش مصنوعی
+        # 1. تولید متن توسط AI
         email_body = await ai_service.generate_email(target_data['topic'], custom_details=custom_info)
         email_subject = target_data['topic']
 
-        # 2. آماده‌سازی لینک‌ها (برای دکمه‌های دسکتاپ)
-        # تبدیل متن به فرمت URL (اسپیس به %20 و ...)
-        windows_body = email_body.replace("\n", "\r\n") # سازگاری بهتر با ویندوز
-        url_safe_body = urllib.parse.quote(windows_body, safe='')
-        url_safe_subject = urllib.parse.quote(email_subject, safe='')
-
-        # ساخت دکمه‌ها
+        # 2. ساخت دکمه‌ها (فقط باز کردن اپلیکیشن ایمیل)
         keyboard = []
-        # اضافه کردن دکمه‌های Gmail برای هر گیرنده
         for idx, email in enumerate(target_data['emails']):
-            gmail_link = f"https://mail.google.com/mail/?view=cm&fs=1&to={email}&su={url_safe_subject}&body={url_safe_body}"
-            keyboard.append([InlineKeyboardButton(f"🚀 ارسال با Gmail (گیرنده {idx+1})", url=gmail_link)])
+            # لینک mailto ساده: فقط گیرنده را ست می‌کند
+            # این لینک روی موبایل اپلیکیشن ایمیل را باز می‌کند و روی دسکتاپ برنامه پیش‌فرض را
+            mailto_link = f"mailto:{email}"
+            
+            keyboard.append([InlineKeyboardButton(f"📧 باز کردن ایمیل (گیرنده {idx+1})", url=mailto_link)])
         
-        # دکمه بازگشت
         keyboard.append([InlineKeyboardButton("🔙 بازگشت به منو", callback_data="BACK_TO_MENU")])
 
-        # 3. آماده‌سازی متن برای نمایش و کپی (برای موبایل)
-        # تبدیل کاراکترهای HTML برای نمایش درست
+        # 3. آماده‌سازی متن برای نمایش و کپی
         display_safe_subject = html.escape(email_subject)
         display_safe_body = html.escape(email_body)
         emails_list_str = ", ".join(target_data['emails'])
 
-        # ساخت پیام نهایی
+        # 4. پیام راهنما و متن‌ها
         final_text = (
             f"✅ **ایمیل شما آماده است!**\n\n"
             f"👤 **گیرندگان:** {html.escape(emails_list_str)}\n"
             f"──────────────────\n"
-            f"💻 **نسخه دسکتاپ:**\n"
-            f"برای باز کردن مستقیم Gmail، روی دکمه‌های بالا کلیک کنید.\n\n"
-            f"📱 **نسخه موبایل (کپی آسان):**\n"
-            f"روی متن‌های زیر بزنید تا خودکار کپی شوند:\n\n"
+            f"۱. روی دکمه‌های بالا بزنید تا برنامه ایمیل باز شود.\n"
+            f"۲. سپس **موضوع** و **متن** زیر را لمس کنید تا کپی شوند و در ایمیل خود Paste کنید:\n\n"
             
             f"👇 **موضوع (Subject):**\n"
-            f"<code>{display_safe_subject}</code>\n\n" # تگ code باعث کپی شدن با لمس می‌شود
+            f"<code>{display_safe_subject}</code>\n\n" # کپی با یک کلیک
             
             f"👇 **متن ایمیل (Body):**\n"
-            f"<code>{display_safe_body}</code>"      # تگ code باعث کپی شدن با لمس می‌شود
+            f"<code>{display_safe_body}</code>"      # کپی با یک کلیک
         )
 
         await message_to_edit.edit_text(
@@ -150,7 +142,6 @@ async def generate_final_email(update: Update, context: ContextTypes.DEFAULT_TYP
 
     except Exception as e:
         print(f"Error: {e}")
-        # اگر خطا داد (مثلاً متن خیلی طولانی بود)، فقط دکمه بازگشت را نشان بده
         error_keyboard = [[InlineKeyboardButton("🔙 بازگشت", callback_data="BACK_TO_MENU")]]
         await message_to_edit.edit_text(
             text="❌ متاسفانه خطایی رخ داد. لطفاً دوباره تلاش کنید.", 

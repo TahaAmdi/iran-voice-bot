@@ -65,3 +65,6 @@ if __name__ == '__main__':
 
 
     #poetry run python main.py
+    """git add .
+git commit -m "Prepare for Railway deployment"
+git push"""
