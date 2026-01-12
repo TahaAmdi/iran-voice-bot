@@ -27,16 +27,16 @@ from handlers.email_gen import (
 )
 
 # ----------------------------------------------------------------
-# 1. تنظیمات وب‌سایت (Flask) - این بخش برای Railway حیاتی است
+# 1. تنظیمات وب‌سایت (Flask)
 # ----------------------------------------------------------------
 app = Flask(__name__)
 
-# خواندن آدرس سایت از تنظیمات Railway (یا پیش‌فرض لوکال)
+# خواندن آدرس سایت از تنظیمات
 BASE_URL = os.getenv("PUBLIC_URL", "http://127.0.0.1:5000")
 
 @app.route('/')
 def home():
-    return "✅ Server is running! Bot should be active."
+    return "✅ Server is running! Bot is active."
 
 @app.route('/email-redirect')
 def email_redirect():
@@ -82,7 +82,6 @@ async def back_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data.clear()
     await start_handler(update, context)
 
-# این تابع بات را به صورت Async اجرا می‌کند
 async def run_bot_async():
     if not settings.TELEGRAM_TOKEN:
         print("❌ Error: TELEGRAM_TOKEN missing")
@@ -91,7 +90,7 @@ async def run_bot_async():
     print("🚀 Starting Telegram Bot in background...")
     application = ApplicationBuilder().token(settings.TELEGRAM_TOKEN).build()
 
-    # هندلرها
+    # اضافه کردن هندلرها
     application.add_handler(CommandHandler('start', start_handler))
     application.add_handler(CallbackQueryHandler(back_handler, pattern="^BACK_TO_MENU$"))
     application.add_handler(CallbackQueryHandler(ask_data_handler, pattern="^ADD_DATA_(YES|NO)$"))
@@ -99,15 +98,21 @@ async def run_bot_async():
     application.add_handler(CallbackQueryHandler(target_selection_handler, pattern=keys_pattern))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, receive_custom_data_handler))
 
-    # این خط باعث می‌شود بات شروع به کار کند
-    await application.updater.start_polling(drop_pending_updates=True)
+    # --- بخش مهم و اصلاح شده ---
+    # 1. اول باید initialize کنیم
+    await application.initialize()
+    
+    # 2. بعد start کنیم
     await application.start()
     
-    # بات را زنده نگه می‌دارد
+    # 3. و در نهایت polling را شروع کنیم
+    print("✅ Bot Initialized. Starting Polling...")
+    await application.updater.start_polling(drop_pending_updates=True)
+    
+    # حلقه بی‌نهایت برای زنده نگه داشتن بات
     while True:
         await asyncio.sleep(3600)
 
-# این تابع، محیط Async را برای ترد آماده می‌کند
 def start_bot_thread():
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
@@ -117,14 +122,12 @@ def start_bot_thread():
 # 3. بخش اصلی اجرا
 # ----------------------------------------------------------------
 if __name__ == '__main__':
-    # الف) بات را می‌فرستیم به یک اتاق جداگانه (Thread) تا مزاحم نشود
+    # اجرای بات در ترد جداگانه
     bot_thread = threading.Thread(target=start_bot_thread)
     bot_thread.daemon = True
     bot_thread.start()
 
-    # ب) سایت (Flask) را در همینجا اجرا می‌کنیم تا Railway آن را ببیند
+    # اجرای Flask در ترد اصلی
     port = int(os.environ.get("PORT", 5000))
     print(f"🌍 Starting Web Server on port {port}...")
-    
-    # نکته مهم: host='0.0.0.0' برای دسترسی از بیرون الزامی است
     app.run(host='0.0.0.0', port=port)
