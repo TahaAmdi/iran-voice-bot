@@ -5,7 +5,7 @@ from telegram.constants import ParseMode
 from telegram.ext import ContextTypes
 from services.ai_service import AIService
 from config.targets import TARGETS
-from handlers.menu import start_handler 
+from handlers.menu import start_handler
 
 ai_service = AIService()
 
@@ -82,7 +82,7 @@ async def receive_custom_data_handler(update: Update, context: ContextTypes.DEFA
     await generate_final_email(update, context, message_object=waiting_msg)
 
 # ---------------------------------------------------------
-# مرحله ۴ (نهایی): ساخت لینک‌ها
+# مرحله ۴ (نهایی): ساخت دکمه‌های ایمیل
 # ---------------------------------------------------------
 async def generate_final_email(update: Update, context: ContextTypes.DEFAULT_TYPE, message_object=None):
     target_data = context.user_data.get('selected_target')
@@ -104,43 +104,46 @@ async def generate_final_email(update: Update, context: ContextTypes.DEFAULT_TYP
         email_body = await ai_service.generate_email(target_data['topic'], custom_details=custom_info)
         email_subject = target_data['topic']
 
-        # اینکود کردن متن برای قرارگیری در URL
-        safe_body = urllib.parse.quote(email_body)
-        safe_subject = urllib.parse.quote(email_subject)
-
-        links_section = ""
-        # شمارنده برای اینکه اگر چند ایمیل بود، مشخص شود
-        count = 1
+        # نکته حیاتی: محدود کردن طول متن داخل لینک
+        # اگر متن بیشتر از 1000 کاراکتر باشد، لینک خراب می‌شود.
+        # پس برای لینک، متن را کوتاه می‌کنیم اما متن کامل را در پیام نمایش می‌دهیم.
+        short_body = email_body[:800] + "\n\n[...Text continues...]" if len(email_body) > 800 else email_body
         
+        # اینکود کردن متن
+        safe_body_short = urllib.parse.quote(short_body)
+        safe_subject = urllib.parse.quote(email_subject)
+        
+        # اینکود متن کامل برای نسخه وب (چون وب تحمل بیشتری دارد)
+        safe_body_full = urllib.parse.quote(email_body)
+
+        keyboard = []
+        
+        # ساخت دکمه‌ها برای هر ایمیل
         for email in target_data['emails']:
-            # لینک ۱: Mailto (استاندارد جهانی موبایل)
-            # نکته: در اندروید و iOS این بهترین روش است
-            mailto_link = f"mailto:{email}?subject={safe_subject}&body={safe_body}"
+            # لینک موبایل (Mailto)
+            mailto_link = f"mailto:{email}?subject={safe_subject}&body={safe_body_short}"
             
-            # لینک ۲: وب (فقط دسکتاپ)
-            gmail_web_link = f"https://mail.google.com/mail/?view=cm&fs=1&to={email}&su={safe_subject}&body={safe_body}"
+            # لینک وب (Gmail Web)
+            gmail_web_link = f"https://mail.google.com/mail/?view=cm&fs=1&to={email}&su={safe_subject}&body={safe_body_full}"
             
-            links_section += (
-                f"📨 <b>گیرنده {count}:</b> {email}\n"
-                f"📱 <a href='{mailto_link}'>کلیک برای موبایل (App)</a>\n"
-                f"💻 <a href='{gmail_web_link}'>کلیک برای کامپیوتر (Web)</a>\n\n"
-            )
-            count += 1
+            # اضافه کردن دکمه‌ها
+            keyboard.append([InlineKeyboardButton(f"📱 ارسال با ایمیل‌باکس گوشی ({email})", url=mailto_link)])
+            keyboard.append([InlineKeyboardButton(f"💻 ارسال با Gmail Web", url=gmail_web_link)])
+
+        # دکمه بازگشت
+        keyboard.append([InlineKeyboardButton("🔙 بازگشت به منو", callback_data="BACK_TO_MENU")])
 
         safe_body_display = html.escape(email_body)
         
         final_text = (
             f"✅ **متن آماده شد!**\n"
-            f"{f'📌 <b>توضیحات شما:</b> {html.escape(custom_info[:50])}...' if custom_info else ''}\n\n"
+            f"🎯 <b>هدف:</b> {target_data['name']}\n"
             f"📝 <b>موضوع:</b> {email_subject}\n\n"
-            f"👇 <b>لطفاً بر اساس دستگاه خود انتخاب کنید:</b>\n\n"
-            f"{links_section}"
-            f"--------------------------------\n"
-            f"⚠️ <i>نکته مهم: اگر لینک موبایل کار نکرد، یعنی متن ایمیل خیلی طولانی شده است. لطفاً متن زیر را دستی کپی کنید:</i>\n\n"
+            f"👇 <b>روی دکمه‌های زیر کلیک کنید:</b>\n"
+            f"(اگر دکمه موبایل متن را کامل نیاورد، متن زیر را دستی کپی کنید)\n\n"
+            f"🔻 <b>متن کامل ایمیل:</b>\n"
             f"<pre>{safe_body_display}</pre>"
         )
-
-        keyboard = [[InlineKeyboardButton("🔙 بازگشت به منو", callback_data="BACK_TO_MENU")]]
 
         await message_to_edit.edit_text(
             text=final_text,
@@ -151,4 +154,18 @@ async def generate_final_email(update: Update, context: ContextTypes.DEFAULT_TYP
 
     except Exception as e:
         print(f"Error: {e}")
-        await message_to_edit.edit_text("❌ خطا در ارتباط با هوش مصنوعی.")
+        # اگر حتی با کوتاه کردن هم ارور داد، لینک‌ها را حذف می‌کنیم و فقط متن می‌دهیم
+        safe_body_display = html.escape(email_body)
+        fallback_text = (
+            f"✅ **متن آماده شد!**\n\n"
+            f"⚠️ *لینک خودکار به دلیل طولانی بودن متن ساخته نشد.*\n"
+            f"لطفاً متن زیر را کپی کرده و دستی ایمیل کنید:\n\n"
+            f"📧 **گیرنده:** {', '.join(target_data['emails'])}\n"
+            f"📝 **موضوع:** {email_subject}\n\n"
+            f"<pre>{safe_body_display}</pre>"
+        )
+        await message_to_edit.edit_text(
+            text=fallback_text,
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data="BACK_TO_MENU")]]),
+            parse_mode=ParseMode.HTML
+        )
