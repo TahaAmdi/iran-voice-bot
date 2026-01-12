@@ -3,116 +3,184 @@ import html
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ForceReply
 from telegram.constants import ParseMode
 from telegram.ext import ContextTypes
+
 from services.ai_service import AIService
 from config.targets import TARGETS
 from handlers.menu import start_handler
 
 ai_service = AIService()
 
+MAX_MAILTO_BODY_LEN = 1800  # حد امن برای mailto روی موبایل
+
+
+def shorten(text: str, n: int = 60) -> str:
+    if not text:
+        return ""
+    return text if len(text) <= n else text[:n] + "…"
+
+
 # ---------------------------------------------------------
-# هندلرهای انتخاب و دریافت متن (بدون تغییر)
+# مرحله ۱: انتخاب سازمان
 # ---------------------------------------------------------
 async def target_selection_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
+
     target_key = query.data
     target_data = TARGETS.get(target_key)
-    if not target_data: return
-    context.user_data['selected_target'] = target_data
-    context.user_data['custom_info'] = None  
-    text = (f"🎯 شما «{target_data['name']}» را انتخاب کردید.\n\n" "📊 **آیا می‌خواهید آمار یا جزئیات خاصی به متن اضافه کنید؟**")
-    keyboard = [[InlineKeyboardButton("✅ بله، می‌نویسم", callback_data="ADD_DATA_YES")], [InlineKeyboardButton("❌ خیر، بساز", callback_data="ADD_DATA_NO")], [InlineKeyboardButton("🔙 بازگشت", callback_data="BACK_TO_MENU")]]
-    await query.edit_message_text(text=text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode=ParseMode.MARKDOWN)
+    if not target_data:
+        return
 
+    context.user_data.clear()
+    context.user_data["selected_target"] = target_data
+
+    text = (
+        f"🎯 شما «{target_data['name']}» را انتخاب کردید.\n\n"
+        "📊 آیا می‌خواهید آمار یا جزئیات خاصی به متن اضافه کنید؟"
+    )
+
+    keyboard = [
+        [InlineKeyboardButton("✅ بله، می‌نویسم", callback_data="ADD_DATA_YES")],
+        [InlineKeyboardButton("❌ خیر، بساز", callback_data="ADD_DATA_NO")],
+        [InlineKeyboardButton("🔙 بازگشت", callback_data="BACK_TO_MENU")]
+    ]
+
+    await query.edit_message_text(
+        text=text,
+        reply_markup=InlineKeyboardMarkup(keyboard),
+        parse_mode=ParseMode.MARKDOWN
+    )
+
+
+# ---------------------------------------------------------
+# مرحله ۲: انتخاب افزودن یا عدم افزودن متن
+# ---------------------------------------------------------
 async def ask_data_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    if query.data == "ADD_DATA_NO": await generate_final_email(update, context)
-    elif query.data == "ADD_DATA_YES":
-        context.user_data['state'] = 'WAITING_FOR_DETAILS'
-        await query.message.delete()
-        await context.bot.send_message(chat_id=update.effective_chat.id, text="✍️ لطفاً متن خود را بنویسید:", reply_markup=ForceReply(input_field_placeholder="مثلا: قطعی اینترنت..."))
 
-async def receive_custom_data_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if context.user_data.get('state') != 'WAITING_FOR_DETAILS':
-        try: await update.message.delete()
-        except: pass
-        await update.message.reply_text("⛔️ لطفاً فقط از دکمه‌های منو استفاده کنید.")
-        return 
-    context.user_data['custom_info'] = update.message.text
-    context.user_data['state'] = None 
-    waiting_msg = await update.message.reply_text("⏳ در حال نوشتن ایمیل...")
-    await generate_final_email(update, context, message_object=waiting_msg)
+    if query.data == "ADD_DATA_NO":
+        await generate_final_email(update, context)
+
+    elif query.data == "ADD_DATA_YES":
+        context.user_data["state"] = "WAITING_FOR_DETAILS"
+        await query.message.delete()
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="✍️ لطفاً متن یا جزئیات موردنظر خود را بنویسید:",
+            reply_markup=ForceReply(input_field_placeholder="مثلاً: قطعی اینترنت در تهران...")
+        )
+
 
 # ---------------------------------------------------------
-# مرحله نهایی: چیدمان دقیق طبق عکس درخواستی
+# مرحله ۳: دریافت متن کاربر
+# ---------------------------------------------------------
+async def receive_custom_data_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if context.user_data.get("state") != "WAITING_FOR_DETAILS":
+        try:
+            await update.message.delete()
+        except:
+            pass
+        await update.message.reply_text("⛔️ لطفاً فقط از دکمه‌های منو استفاده کنید.")
+        return
+
+    context.user_data["custom_info"] = update.message.text
+    context.user_data["state"] = None
+
+    waiting = await update.message.reply_text("⏳ دریافت شد. در حال آماده‌سازی ایمیل…")
+    await generate_final_email(update, context, message_object=waiting)
+
+
+# ---------------------------------------------------------
+# مرحله ۴: ساخت لینک‌ها و خروجی نهایی
 # ---------------------------------------------------------
 async def generate_final_email(update: Update, context: ContextTypes.DEFAULT_TYPE, message_object=None):
-    target_data = context.user_data.get('selected_target')
-    custom_info = context.user_data.get('custom_info')
+    target_data = context.user_data.get("selected_target")
+    custom_info = context.user_data.get("custom_info")
 
     if not target_data:
         await start_handler(update, context)
         return
 
-    message_to_edit = message_object or update.callback_query.message
-    if not message_to_edit: return
+    message = (
+        message_object
+        or (update.callback_query.message if update.callback_query else None)
+    )
+    if not message:
+        return
 
     try:
-        # 1. تولید متن توسط AI
-        email_body = await ai_service.generate_email(target_data['topic'], custom_details=custom_info)
-        email_subject = target_data['topic']
+        # -------- تولید متن ایمیل --------
+        full_body = await ai_service.generate_email(
+            target_data["topic"],
+            custom_details=custom_info
+        )
+        full_subject = target_data["topic"]
 
-        # 2. آماده‌سازی لینک‌ها (Encoding)
-        # برای لینک وب (کامل)
-        windows_body = email_body.replace("\n", "\r\n")
-        url_safe_body = urllib.parse.quote(windows_body, safe='')
-        url_safe_subject = urllib.parse.quote(email_subject, safe='')
+        # -------- نسخه‌های کوتاه برای mailto --------
+        short_subject = shorten(full_subject, 80)
+        short_body = full_body[:MAX_MAILTO_BODY_LEN]
 
-        # 3. ساخت دکمه‌ها (به ازای هر گیرنده ۲ دکمه)
-        keyboard = []
-        
-        for idx, email in enumerate(target_data['emails']):
-            # لینک موبایل: فقط mailto ساده (بدون موضوع/بدنه که کرش نکند)
-            mobile_link = f"mailto:{email}"
-            
-            # لینک وب: کامل (Gmail Composer)
-            web_link = f"https://mail.google.com/mail/?view=cm&fs=1&to={email}&su={url_safe_subject}&body={url_safe_body}"
-            
-            # چیدمان: هر گیرنده در یک ردیف جداگانه با دو گزینه
-            keyboard.append([
-                InlineKeyboardButton(f"📱 موبایل (گیرنده {idx+1})", url=mobile_link),
-                InlineKeyboardButton(f"💻 وب (Gmail)", url=web_link)
-            ])
+        # -------- encode برای URL --------
+        safe_short_subject = urllib.parse.quote(short_subject)
+        safe_short_body = urllib.parse.quote(short_body)
 
-        keyboard.append([InlineKeyboardButton("🔙 بازگشت به منو", callback_data="BACK_TO_MENU")])
+        safe_full_subject = urllib.parse.quote(full_subject)
+        safe_full_body = urllib.parse.quote(full_body)
 
-        # 4. آماده‌سازی متن‌های کپی (HTML Escaping)
-        display_safe_subject = html.escape(email_subject)
-        display_safe_body = html.escape(email_body)
-        
-        # لیست ایمیل‌ها فقط جهت نمایش متنی
-        emails_display = ", ".join([f"<code>{e}</code>" for e in target_data['emails']])
+        # -------- ساخت لینک‌ها --------
+        links_section = ""
+        for idx, email in enumerate(target_data["emails"], start=1):
 
-        # 5. چیدمان پیام نهایی (Header + Instructions + Copyable Text)
+            # mailto → کوتاه
+            mailto_link = (
+                f"mailto:{email}"
+                f"?subject={safe_short_subject}&body={safe_short_body}"
+            )
+
+            # gmail web → کامل
+            gmail_web_link = (
+                "https://mail.google.com/mail/"
+                f"?view=cm&fs=1&to={email}"
+                f"&su={safe_full_subject}&body={safe_full_body}"
+            )
+
+            links_section += (
+                f"📨 <b>گیرنده {idx}:</b> {email}\n"
+                f"📱 <a href='{mailto_link}'>باز کردن در اپ ایمیل (متن کوتاه)</a>\n"
+                f"💻 <a href='{gmail_web_link}'>باز کردن در Gmail Web (متن کامل)</a>\n\n"
+            )
+
+        # -------- نسخه‌های نمایشی برای کپی --------
+        safe_subject_display = html.escape(full_subject)
+        safe_body_display = html.escape(full_body)
+
+        # -------- متن نهایی --------
         final_text = (
-            f"🎯 <b>هدف: {target_data['name']}</b>\n\n"
-            f"✅ <b>ایمیل شما آماده است!</b>\n"
-            f"دستورالعمل:\n"
-            f"۱. برای موبایل دکمه «موبایل» و برای کامپیوتر «وب» را بزنید.\n"
-            f"۲. اگر از دکمه موبایل استفاده کردید، متن‌های پایین را لمس کنید تا کپی شوند و در ایمیل Paste کنید.\n\n"
-            
-            f"📬 <b>لیست گیرندگان:</b>\n"
-            f"{emails_display}\n\n"
-
-            f"👇 <b>موضوع (Subject):</b>\n"
-            f"<code>{display_safe_subject}</code>\n\n"
-            
-            f"👇 <b>متن ایمیل (Body):</b>\n"
-            f"<code>{display_safe_body}</code>"
+            "✅ <b>ایمیل شما آماده است</b>\n\n"
+            "📱 <b>راهنمای موبایل:</b>\n"
+            "اگر لینک اپ فقط Gmail را باز کرد، subject و متن زیر را کپی کنید.\n\n"
+            "💻 <b>راهنمای کامپیوتر:</b>\n"
+            "لینک Gmail Web ایمیل را با متن کامل باز می‌کند.\n\n"
+            f"📝 <b>موضوع:</b> {safe_subject_display}\n"
+            f"{f'📌 <b>توضیحات شما:</b> {html.escape(shorten(custom_info))}\n' if custom_info else ''}\n"
+            "👇 <b>لینک‌ها:</b>\n\n"
+            f"{links_section}"
+            "━━━━━━━━━━━━━━━━━━\n"
+            "📌 <b>Subject کامل (برای کپی):</b>\n"
+            "روی متن بزنید و نگه دارید → Copy\n\n"
+            f"<pre>{safe_subject_display}</pre>\n"
+            "━━━━━━━━━━━━━━━━━━\n"
+            "✂️ <b>متن کامل ایمیل (برای کپی):</b>\n"
+            "روی متن بزنید و نگه دارید → Copy\n\n"
+            f"<pre>{safe_body_display}</pre>"
         )
 
-        await message_to_edit.edit_text(
+        keyboard = [
+            [InlineKeyboardButton("🔙 بازگشت به منو", callback_data="BACK_TO_MENU")]
+        ]
+
+        await message.edit_text(
             text=final_text,
             reply_markup=InlineKeyboardMarkup(keyboard),
             parse_mode=ParseMode.HTML,
@@ -120,6 +188,5 @@ async def generate_final_email(update: Update, context: ContextTypes.DEFAULT_TYP
         )
 
     except Exception as e:
-        print(f"Error: {e}")
-        err_kb = [[InlineKeyboardButton("🔙 بازگشت", callback_data="BACK_TO_MENU")]]
-        await message_to_edit.edit_text("❌ خطا در تولید ایمیل.", reply_markup=InlineKeyboardMarkup(err_kb))
+        print("EMAIL_GENERATION_ERROR:", e)
+        await message.edit_text("❌ خطا در ساخت ایمیل. لطفاً دوباره تلاش کنید.")
