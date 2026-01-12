@@ -82,7 +82,7 @@ async def receive_custom_data_handler(update: Update, context: ContextTypes.DEFA
     await generate_final_email(update, context, message_object=waiting_msg)
 
 # ---------------------------------------------------------
-# مرحله ۴ (نهایی): ساخت دکمه‌های ایمیل
+# مرحله ۴ (نهایی): ساخت دکمه‌ها با لینک بهینه شده
 # ---------------------------------------------------------
 async def generate_final_email(update: Update, context: ContextTypes.DEFAULT_TYPE, message_object=None):
     target_data = context.user_data.get('selected_target')
@@ -104,44 +104,37 @@ async def generate_final_email(update: Update, context: ContextTypes.DEFAULT_TYP
         email_body = await ai_service.generate_email(target_data['topic'], custom_details=custom_info)
         email_subject = target_data['topic']
 
-        # نکته حیاتی: محدود کردن طول متن داخل لینک
-        # اگر متن بیشتر از 1000 کاراکتر باشد، لینک خراب می‌شود.
-        # پس برای لینک، متن را کوتاه می‌کنیم اما متن کامل را در پیام نمایش می‌دهیم.
-        short_body = email_body[:800] + "\n\n[...Text continues...]" if len(email_body) > 800 else email_body
+        # کوتاه کردن متن برای دکمه‌ها (URL Limit Safety)
+        # لینک‌ها محدودیت طول دارند (حدود ۲۰۰۰ کاراکتر). اگر متن زیاد باشد، لینک کار نمی‌کند.
+        # پس برای دکمه، متن را خلاصه می‌کنیم اما در پیام اصلی متن کامل را می‌گذاریم.
+        short_body = email_body[:1500] 
         
-        # اینکود کردن متن
         safe_body_short = urllib.parse.quote(short_body)
         safe_subject = urllib.parse.quote(email_subject)
-        
-        # اینکود متن کامل برای نسخه وب (چون وب تحمل بیشتری دارد)
-        safe_body_full = urllib.parse.quote(email_body)
 
         keyboard = []
         
-        # ساخت دکمه‌ها برای هر ایمیل
         for email in target_data['emails']:
-            # لینک موبایل (Mailto)
+            # لینک ۱: اپلیکیشن (Mailto) - بهترین گزینه برای موبایل
             mailto_link = f"mailto:{email}?subject={safe_subject}&body={safe_body_short}"
             
-            # لینک وب (Gmail Web)
-            gmail_web_link = f"https://mail.google.com/mail/?view=cm&fs=1&to={email}&su={safe_subject}&body={safe_body_full}"
+            # لینک ۲: وب (Web) - با ترفند u/0/ برای جلوگیری از ریدایرکت
+            gmail_web_link = f"https://mail.google.com/mail/u/0/?view=cm&fs=1&to={email}&su={safe_subject}&body={safe_body_short}"
             
-            # اضافه کردن دکمه‌ها
-            keyboard.append([InlineKeyboardButton(f"📱 ارسال با ایمیل‌باکس گوشی ({email})", url=mailto_link)])
-            keyboard.append([InlineKeyboardButton(f"💻 ارسال با Gmail Web", url=gmail_web_link)])
+            keyboard.append([InlineKeyboardButton(f"📱 اپلیکیشن ایمیل ({email})", url=mailto_link)])
+            keyboard.append([InlineKeyboardButton(f"🌐 نسخه وب Gmail", url=gmail_web_link)])
 
-        # دکمه بازگشت
         keyboard.append([InlineKeyboardButton("🔙 بازگشت به منو", callback_data="BACK_TO_MENU")])
 
         safe_body_display = html.escape(email_body)
         
         final_text = (
-            f"✅ **متن آماده شد!**\n"
-            f"🎯 <b>هدف:</b> {target_data['name']}\n"
+            f"✅ **ایمیل شما آماده است!**\n"
+            f"🎯 <b>گیرنده:</b> {target_data['name']}\n"
             f"📝 <b>موضوع:</b> {email_subject}\n\n"
-            f"👇 <b>روی دکمه‌های زیر کلیک کنید:</b>\n"
-            f"(اگر دکمه موبایل متن را کامل نیاورد، متن زیر را دستی کپی کنید)\n\n"
-            f"🔻 <b>متن کامل ایمیل:</b>\n"
+            f"👇 <b>روی دکمه‌های زیر بزنید:</b>\n"
+            f"<i>(اگر دکمه‌ها کار نکردند یا متن ناقص بود، متن پایین را کپی کنید)</i>\n\n"
+            f"🔻 <b>متن کامل (برای کپی):</b>\n"
             f"<pre>{safe_body_display}</pre>"
         )
 
@@ -154,18 +147,10 @@ async def generate_final_email(update: Update, context: ContextTypes.DEFAULT_TYP
 
     except Exception as e:
         print(f"Error: {e}")
-        # اگر حتی با کوتاه کردن هم ارور داد، لینک‌ها را حذف می‌کنیم و فقط متن می‌دهیم
+        # حالت اضطراری: اگر کلاً لینک ساخته نشد
         safe_body_display = html.escape(email_body)
-        fallback_text = (
-            f"✅ **متن آماده شد!**\n\n"
-            f"⚠️ *لینک خودکار به دلیل طولانی بودن متن ساخته نشد.*\n"
-            f"لطفاً متن زیر را کپی کرده و دستی ایمیل کنید:\n\n"
-            f"📧 **گیرنده:** {', '.join(target_data['emails'])}\n"
-            f"📝 **موضوع:** {email_subject}\n\n"
-            f"<pre>{safe_body_display}</pre>"
-        )
         await message_to_edit.edit_text(
-            text=fallback_text,
+            text=f"✅ **متن آماده شد!**\n(لینک طولانی بود، لطفاً دستی کپی کنید)\n\n<pre>{safe_body_display}</pre>",
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data="BACK_TO_MENU")]]),
             parse_mode=ParseMode.HTML
         )
