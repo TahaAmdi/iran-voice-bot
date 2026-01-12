@@ -1,0 +1,36 @@
+# --- Python Bytecode (فایل‌های کامپایل شده پایتون) ---
+__pycache__/
+*.py[cod]
+*$py.class
+
+# --- Virtual Environments (محیط مجازی) ---
+# پوشه‌های محیط مجازی نباید آپلود شوند چون حجم زیادی دارند
+venv/
+env/
+.venv/
+.env/
+
+# --- Environment Variables (امنیتی - خیلی مهم) ---
+# فایل حاوی توکن و رمزها هرگز نباید آپلود شود
+.env
+.env.local
+.env.*.local
+
+# --- Logs (لاگ‌های برنامه) ---
+*.log
+logs/
+
+# --- IDE & Editor Settings (تنظیمات ادیتورها) ---
+# تنظیمات شخصی وی‌اس‌کد یا پای‌چارم
+.vscode/
+.idea/
+*.swp
+
+# --- OS Files (فایل‌های سیستمی) ---
+.DS_Store
+Thumbs.db
+
+# --- Distribution / Builds (اگر بیلد گرفته شود) ---
+dist/
+build/
+*.egg-info/

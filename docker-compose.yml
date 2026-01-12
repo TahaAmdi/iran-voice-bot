@@ -1,0 +1,11 @@
+version: '3.8'
+
+services:
+  iran-email-bot:
+    build: .
+    container_name: iran_email_bot
+    restart: always  
+    env_file:
+      - .env        
+    volumes:
+      - ./data:/app/data

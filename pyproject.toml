@@ -1,0 +1,22 @@
+[tool.poetry]
+package-mode = false
+name = "iran-email-bot"
+version = "0.1.0"
+description = "A bot to facilitate sending protest emails."
+authors = ["David Amdi <your_email@example.com>"]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+python-telegram-bot = "^20.7"
+openai = "^1.10.0"
+pydantic = "^2.5.0"
+pydantic-settings = "^2.1.0"
+python-dotenv = "^1.0.0"
+
+[tool.poetry.group.dev.dependencies]
+black = "^24.0"
+ruff = "^0.1.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

@@ -1,0 +1,40 @@
+TARGETS = {
+  "UN_HRC": {
+    "name": "سازمان ملل (حقوق بشر) 🇺🇳",
+    "emails": [
+      "hrc-sr-iran@un.org",
+      "cp@ohchr.org",
+      "ie-iran@ohchr.org"
+    ],
+    "topic": "Urgent Appeal: Human Rights Violations and Suppression in Iran"
+  },
+  "INTERNET_FREEDOM": {
+    "name": "آزادی اینترنت (Tech/Rights) 🌐",
+    "emails": [
+      "rights@accessnow.org",
+      "info@eff.org",
+      "press@article19.org"
+    ],
+    "topic": "Urgent Action: Stop Internet Shutdowns and Digital Censorship in Iran"
+  },
+  "MEDIA": {
+    "name": "خبرگزاری‌های جهانی 📰",
+    "emails": [
+      "tips@cnn.com",
+      "foreign@nytimes.com",
+      "haveyoursay@bbc.co.uk",
+      "tips@guardian.com"
+    ],
+    "topic": "Press Release: Crimes Against Humanity in Iran - Immediate Coverage Needed"
+  },
+  "GOVERNMENTS": {
+    "name": "وزارت خارجه‌ها (EU/UK/DE) 🇪🇺",
+    "emails": [
+      "fcdo.correspondence@fcdo.gov.uk",
+      "buergerservice@diplo.de",
+      "minister.office@international.gc.ca",
+      "davidahmadi272@gmail.com"
+    ],
+    "topic": "Diplomatic Action Required: Condemn Human Rights Abuses in Iran"
+  }
+}
