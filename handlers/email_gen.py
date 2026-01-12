@@ -82,7 +82,7 @@ async def receive_custom_data_handler(update: Update, context: ContextTypes.DEFA
     await generate_final_email(update, context, message_object=waiting_msg)
 
 # ---------------------------------------------------------
-# مرحله ۴ (نهایی): ساخت دکمه‌ها با لینک بهینه شده
+# مرحله ۴ (نهایی): فقط لینک وب (تک دکمه)
 # ---------------------------------------------------------
 async def generate_final_email(update: Update, context: ContextTypes.DEFAULT_TYPE, message_object=None):
     target_data = context.user_data.get('selected_target')
@@ -104,10 +104,9 @@ async def generate_final_email(update: Update, context: ContextTypes.DEFAULT_TYP
         email_body = await ai_service.generate_email(target_data['topic'], custom_details=custom_info)
         email_subject = target_data['topic']
 
-        # کوتاه کردن متن برای دکمه‌ها (URL Limit Safety)
-        # لینک‌ها محدودیت طول دارند (حدود ۲۰۰۰ کاراکتر). اگر متن زیاد باشد، لینک کار نمی‌کند.
-        # پس برای دکمه، متن را خلاصه می‌کنیم اما در پیام اصلی متن کامل را می‌گذاریم.
-        short_body = email_body[:1500] 
+        # کوتاه کردن متن برای اطمینان (URL Limit)
+        # گوگل در حالت وب تا حدود ۲۰۰۰ کاراکتر را در URL قبول می‌کند
+        short_body = email_body[:1800] 
         
         safe_body_short = urllib.parse.quote(short_body)
         safe_subject = urllib.parse.quote(email_subject)
@@ -115,26 +114,23 @@ async def generate_final_email(update: Update, context: ContextTypes.DEFAULT_TYP
         keyboard = []
         
         for email in target_data['emails']:
-            # لینک ۱: اپلیکیشن (Mailto) - بهترین گزینه برای موبایل
-            mailto_link = f"mailto:{email}?subject={safe_subject}&body={safe_body_short}"
-            
-            # لینک ۲: وب (Web) - با ترفند u/0/ برای جلوگیری از ریدایرکت
+            # فقط و فقط لینک وب Gmail
+            # از u/0/ استفاده می‌کنیم که در موبایل هم پایدارتر است
             gmail_web_link = f"https://mail.google.com/mail/u/0/?view=cm&fs=1&to={email}&su={safe_subject}&body={safe_body_short}"
             
-            keyboard.append([InlineKeyboardButton(f"📱 اپلیکیشن ایمیل ({email})", url=mailto_link)])
-            keyboard.append([InlineKeyboardButton(f"🌐 نسخه وب Gmail", url=gmail_web_link)])
+            keyboard.append([InlineKeyboardButton(f"📧 ارسال با Gmail ({email})", url=gmail_web_link)])
 
         keyboard.append([InlineKeyboardButton("🔙 بازگشت به منو", callback_data="BACK_TO_MENU")])
 
         safe_body_display = html.escape(email_body)
         
         final_text = (
-            f"✅ **ایمیل شما آماده است!**\n"
+            f"✅ **ایمیل آماده ارسال است!**\n"
             f"🎯 <b>گیرنده:</b> {target_data['name']}\n"
             f"📝 <b>موضوع:</b> {email_subject}\n\n"
-            f"👇 <b>روی دکمه‌های زیر بزنید:</b>\n"
-            f"<i>(اگر دکمه‌ها کار نکردند یا متن ناقص بود، متن پایین را کپی کنید)</i>\n\n"
-            f"🔻 <b>متن کامل (برای کپی):</b>\n"
+            f"👇 <b>روی دکمه زیر بزنید تا Gmail باز شود:</b>\n"
+            f"<i>(اگر لینک باز نشد یا متن ناقص بود، متن پایین را کپی کنید)</i>\n\n"
+            f"🔻 <b>متن کامل (جهت کپی دستی):</b>\n"
             f"<pre>{safe_body_display}</pre>"
         )
 
@@ -147,10 +143,9 @@ async def generate_final_email(update: Update, context: ContextTypes.DEFAULT_TYP
 
     except Exception as e:
         print(f"Error: {e}")
-        # حالت اضطراری: اگر کلاً لینک ساخته نشد
         safe_body_display = html.escape(email_body)
         await message_to_edit.edit_text(
-            text=f"✅ **متن آماده شد!**\n(لینک طولانی بود، لطفاً دستی کپی کنید)\n\n<pre>{safe_body_display}</pre>",
+            text=f"✅ **متن آماده شد!**\n(خطا در ساخت لینک، لطفاً دستی کپی کنید)\n\n<pre>{safe_body_display}</pre>",
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data="BACK_TO_MENU")]]),
             parse_mode=ParseMode.HTML
         )
