@@ -146,6 +146,14 @@ async def generate_final_email(update: Update, context: ContextTypes.DEFAULT_TYP
         safe_body_display = html.escape(email_body)
         safe_subject_display = html.escape(email_subject)
 
+        # -------------------------------------------------------
+        # اصلاح فیکس شده برای جلوگیری از ارور بک‌اسلش در f-string
+        # -------------------------------------------------------
+        custom_info_line = ""
+        if custom_info:
+            safe_custom_info = html.escape(shorten(custom_info))
+            custom_info_line = f"📌 <b>توضیحات شما:</b> {safe_custom_info}\n"
+
         final_text = (
             "✅ <b>ایمیل شما آماده است</b>\n\n"
             "📱 <b>راهنمای موبایل:</b>\n"
@@ -153,7 +161,7 @@ async def generate_final_email(update: Update, context: ContextTypes.DEFAULT_TYP
             "💻 <b>راهنمای کامپیوتر:</b>\n"
             "لینک Gmail Web ایمیل را با متن آماده باز می‌کند.\n\n"
             f"📝 <b>موضوع:</b> {safe_subject_display}\n"
-            f"{f'📌 <b>توضیحات شما:</b> {html.escape(shorten(custom_info))}\n' if custom_info else ''}\n"
+            f"{custom_info_line}\n"  # استفاده از متغیر آماده شده
             "👇 <b>لینک‌ها:</b>\n\n"
             f"{links_section}"
             "━━━━━━━━━━━━━━━━━━\n"
