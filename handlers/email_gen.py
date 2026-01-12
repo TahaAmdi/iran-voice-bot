@@ -45,7 +45,7 @@ async def target_selection_handler(update: Update, context: ContextTypes.DEFAULT
     # نمایش توضیح فارسی هدف در متن پیام
     topic_fa = target_data.get("topic_fa", "ارسال گزارش")
     text = (
-        f"🎯 **هدف:** {target_data['name']}\n"
+        f"🎯 **هدف:** {target_data['name_fa']}\n"
         f"📝 **موضوع فعالیت:** {topic_fa}\n\n"
         "📬 لطفاً مشخص کنید گیرنده پیام شما کدام بخش باشد:"
     )
@@ -185,7 +185,7 @@ async def generate_final_email(update: Update, context: ContextTypes.DEFAULT_TYP
             "📖 **راهنمای ارسال:**\n"
             "۱. روی لینک‌های زیر کلیک کنید تا ایمیل باز شود.\n"
             "۲. اگر لینک کار نکرد، موضوع و متن پایین را کپی و دستی ارسال کنید.\n\n"
-            f"🎯 **هدف:** {target_data['name']}\n"
+            f"🎯 **هدف:** {target_data['name_fa']}\n"
             f"📂 **موضوع (Subject):**\n`{safe_subject_display}`\n\n"
             f"{links_section}"
             "━━━━━━━━━━━━━━━━━━\n"
